@@ -42,14 +42,15 @@
 
   const voices = {
     sax(ctx, dest, t, o) {
+      const f = (o.notes && o.notes.length ? o.notes[0] : o.freq) || 440;
       const dur = o.dur + 0.18;
       const osc = ctx.createOscillator();
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(o.freq * 0.97, t);
-      osc.frequency.exponentialRampToValueAtTime(o.freq, t + 0.05);
+      osc.frequency.setValueAtTime(f * 0.97, t);
+      osc.frequency.exponentialRampToValueAtTime(f, t + 0.05);
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = Math.min(o.freq * 5 + 400, 3800);
+      lp.frequency.value = Math.min(f * 5 + 400, 3800);
       lp.Q.value = 1.2;
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, t);
@@ -61,7 +62,7 @@
       breath.loop = true;
       const bp = ctx.createBiquadFilter();
       bp.type = 'bandpass';
-      bp.frequency.value = Math.min(o.freq * 2.5, 3200);
+      bp.frequency.value = Math.min(f * 2.5, 3200);
       bp.Q.value = 0.8;
       const bg = ctx.createGain();
       bg.gain.value = o.vel * 0.25;
@@ -69,17 +70,18 @@
       breath.connect(bp); bp.connect(bg); bg.connect(dest);
       osc.start(t); osc.stop(t + dur + 0.05);
       breath.start(t); breath.stop(t + dur + 0.05);
-      return makeHandle(ctx, [osc, lp, g, breath, bp, bg, ...vibrato(ctx, osc, o.freq, 4.6, o.freq * 0.007, t, o.dur)]);
+      return makeHandle(ctx, [osc, lp, g, breath, bp, bg, ...vibrato(ctx, osc, f, 4.6, f * 0.007, t, o.dur)]);
     },
 
     kalimba(ctx, dest, t, o) {
+      const f = (o.notes && o.notes.length ? o.notes[0] : o.freq) || 440;
       const dur = Math.max(0.9, o.dur);
       const osc = ctx.createOscillator();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(o.freq, t);
+      osc.frequency.setValueAtTime(f, t);
       const part = ctx.createOscillator();
       part.type = 'sine';
-      part.frequency.setValueAtTime(o.freq * 5.4, t);
+      part.frequency.setValueAtTime(f * 5.4, t);
       const pg = ctx.createGain();
       pg.gain.setValueAtTime(o.vel * 0.18, t);
       pg.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
@@ -94,25 +96,26 @@
     },
 
     violin(ctx, dest, t, o) {
+      const f = (o.notes && o.notes.length ? o.notes[0] : o.freq) || 440;
       const dur = o.dur + 0.4;
       const o1 = ctx.createOscillator();
       o1.type = 'sawtooth';
-      o1.frequency.value = o.freq;
+      o1.frequency.value = f;
       o1.detune.value = -6;
       const o2 = ctx.createOscillator();
       o2.type = 'sawtooth';
-      o2.frequency.value = o.freq;
+      o2.frequency.value = f;
       o2.detune.value = 6;
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = Math.min(o.freq * 4 + 600, 3200);
+      lp.frequency.value = Math.min(f * 4 + 600, 3200);
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, t);
       g.gain.linearRampToValueAtTime(o.vel, t + 0.3);
       g.gain.setValueAtTime(o.vel, t + o.dur * 0.75);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      const vib = vibrato(ctx, o1, o.freq, 5.5, o.freq * 0.006, t, o.dur);
-      const vib2 = vibrato(ctx, o2, o.freq, 5.5, o.freq * 0.006, t, o.dur);
+      const vib = vibrato(ctx, o1, f, 5.5, f * 0.006, t, o.dur);
+      const vib2 = vibrato(ctx, o2, f, 5.5, f * 0.006, t, o.dur);
       o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(dest);
       o1.start(t); o1.stop(t + dur + 0.05);
       o2.start(t); o2.stop(t + dur + 0.05);
@@ -133,7 +136,8 @@
       tg.gain.value = 0.04;
       trem.connect(tg); tg.connect(g.gain);
       trem.start(t); trem.stop(t + dur + 0.05);
-      for (const f of o.notes || []) {
+      const chord = (o.notes && o.notes.length ? o.notes : [o.freq || 440]);
+      for (const f of chord) {
         const a = ctx.createOscillator();
         a.type = 'sawtooth';
         a.frequency.value = f;

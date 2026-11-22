@@ -12,12 +12,12 @@
   const $ = (id) => document.getElementById(id);
 
   const LAYERS = [
-    { id: 'sax', label: 'Saxophon', icon: '🎷', gain: 0.16 },
-    { id: 'kalimba', label: 'Kalimba', icon: '🪵', gain: 0.13 },
-    { id: 'violin', label: 'Geige', icon: '🎻', gain: 0.11 },
-    { id: 'accordion', label: 'Ziehharmonika', icon: '🪗', gain: 0.15 },
-    { id: 'coconut', label: 'Kokusnuss-Geklapper', icon: '🥥', gain: 0.3 },
-    { id: 'dog', label: 'Hundegebell', icon: '🐕', gain: 0.4 },
+    { id: 'sax', label: 'Saxophon', icon: '🎷', gain: 0.30 },
+    { id: 'kalimba', label: 'Kalimba', icon: '🪵', gain: 0.25 },
+    { id: 'violin', label: 'Geige', icon: '🎻', gain: 0.22 },
+    { id: 'accordion', label: 'Ziehharmonika', icon: '🪗', gain: 0.28 },
+    { id: 'coconut', label: 'Kokusnuss-Geklapper', icon: '🥥', gain: 0.45 },
+    { id: 'dog', label: 'Hundegebell', icon: '🐕', gain: 0.50 },
   ];
 
   const ui = {
@@ -72,7 +72,7 @@
     bpm: null,
     mc: null,
     trimmedNote: '',
-    layers: { enabled: {}, gains: {}, handles: {}, nextIdx: {}, loop: {}, patterns: {}, timer: null },
+    layers: { enabled: {}, gains: {}, analysers: {}, handles: {}, nextIdx: {}, loop: {}, patterns: {}, timer: null },
   };
 
   function ensureAudioCtx() {
@@ -472,14 +472,20 @@
           continue;
         }
         const absPlayback = state.layers.loop[def.id] * pat.loopDur + ev.t;
-        if (absPlayback >= state.duration) return;
+        if (absPlayback >= state.duration) break;
         const absCtx = state.startedAt + absPlayback;
         if (absCtx > now + 0.3) break;
         if (absCtx >= now - 0.05) {
-          const handle = SynthVoices[def.id](state.audioCtx, state.layers.gains[def.id],
-            Math.max(absCtx, now + 0.01),
-            { freq: state.mc.rootFreq, dur: ev.dur, vel: ev.vel, det: ev.det });
-          state.layers.handles[def.id].push(handle);
+          try {
+            const handle = SynthVoices[def.id](state.audioCtx, state.layers.gains[def.id],
+              Math.max(absCtx, now + 0.01),
+              { freq: ev.notes && ev.notes.length ? ev.notes[0] : state.mc.rootFreq,
+                notes: ev.notes || [state.mc.rootFreq],
+                dur: ev.dur, vel: ev.vel, det: ev.det });
+            state.layers.handles[def.id].push(handle);
+          } catch (e) {
+            console.warn('Layer-Voice ' + def.id + ' Fehler:', e);
+          }
         }
         state.layers.nextIdx[def.id] += 1;
       }
@@ -493,8 +499,12 @@
       if (!state.layers.gains[def.id]) {
         const g = state.audioCtx.createGain();
         g.gain.value = def.gain;
-        g.connect(state.masterGain);
+        const an = state.audioCtx.createAnalyser();
+        an.fftSize = 2048;
+        g.connect(an);
+        an.connect(state.masterGain);
         state.layers.gains[def.id] = g;
+        state.layers.analysers[def.id] = an;
       }
       if (state.layers.handles[def.id] === undefined) state.layers.handles[def.id] = [];
       const row = document.createElement('div');
@@ -536,6 +546,7 @@
   function toggleLayer(id) {
     if (state.mode !== 'stems') return;
     ensureAudioCtx();
+    if (!state.playing) { startPlayback(); }
     state.layers.enabled[id] = !state.layers.enabled[id];
     if (!state.layers.enabled[id]) {
       for (const h of state.layers.handles[id] || []) h.stop();
@@ -639,6 +650,19 @@
       }
       const rms = Math.sqrt(sum / state.meterData.length);
       row.style.width = Math.min(100, rms * 320) + '%';
+    }
+    for (const def of LAYERS) {
+      const an = state.layers.analysers[def.id];
+      const row = ui.layerRows.querySelector('[data-stem="' + def.id + '"] .meter-fill');
+      if (!an || !row) continue;
+      an.getByteTimeDomainData(state.meterData);
+      let sum = 0;
+      for (let i = 0; i < state.meterData.length; i++) {
+        const v = (state.meterData[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / state.meterData.length);
+      row.style.width = Math.min(100, rms * 500) + '%';
     }
   }
 

@@ -67,6 +67,8 @@ app.js              Quellen, Suche, Transport, Layer-Scheduler, Meter
 test/
   separate.test.js  Separierung: FFT/IFFT, Rekonstruktion, Shares
   harmony.test.js   Tonart/BPM/Akkorde/Muster
+  voices.test.js    Synth-Stimmen bauen fehlerfrei und starten Quellen
+  engine.test.js    Ganze App mit gemocktem DOM/WebAudio: Layer planen Quellen
 ```
 
 ## Tests
@@ -74,4 +76,10 @@ test/
 ```bash
 node test/separate.test.js
 node test/harmony.test.js
+node test/voices.test.js
+node test/engine.test.js
 ```
+
+Hinweis: Wird ein Zusatzinstrument aktiviert, während die Wiedergabe pausiert
+oder beendet ist, startet die App die Wiedergabe automatisch neu, damit die
+Layer sofort hörbar sind.

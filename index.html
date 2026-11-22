@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deezer Mixer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <span class="brand-logo">🎵</span>
+      <div>
+        <h1>Deezer Mixer</h1>
+        <p>Musik anhören · Instrumente erkennen · einzeln stummschalten</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="search-card">
+      <form id="search-form" autocomplete="off">
+        <input id="search-input" type="search" placeholder="Song, Künstler oder Album suchen …" required>
+        <button type="submit" id="search-btn">Suchen</button>
+      </form>
+      <div class="suggestions" id="suggestions"></div>
+    </section>
+
+    <section id="status" class="status hidden"></section>
+
+    <section id="results" class="results"></section>
+
+    <section id="player" class="player hidden">
+      <div class="now-playing">
+        <img id="np-cover" alt="Cover">
+        <div class="np-meta">
+          <strong id="np-title"></strong>
+          <span id="np-artist"></span>
+          <a id="np-link" href="#" target="_blank" rel="noopener">Auf Deezer öffnen →</a>
+        </div>
+      </div>
+
+      <div class="transport">
+        <button id="btn-play" class="play-btn" title="Wiedergabe (Leertaste)">▶</button>
+        <span id="time-cur" class="time">0:00</span>
+        <input id="seek" type="range" min="0" max="100" value="0" step="0.1">
+        <span id="time-total" class="time">0:30</span>
+      </div>
+
+      <div class="progress-line hidden" id="analysis-line">
+        <div class="progress-track"><div id="analysis-bar" class="progress-fill"></div></div>
+        <span id="analysis-label">Analysiere …</span>
+      </div>
+
+      <div class="stems" id="stems">
+        <div class="stems-head">
+          <span>Erkannte Instrumente</span>
+          <button id="btn-all" class="ghost-btn">Alle aktivieren</button>
+        </div>
+        <div id="stem-rows"></div>
+        <p class="note">Die Trennung erfolgt live im Browser (STFT + Harmonic/Percussive-Analyse) und ist eine
+          Näherung, kein perfektes Stem-Mastering. Quelle: 30-Sekunden-Preview der Deezer API.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Tastatur: <kbd>Leertaste</kbd> Wiedergabe/Pause · <kbd>1</kbd>–<kbd>4</kbd> Instrumente stummschalten</span>
+    <span>Inhalte &amp; Previews: <a href="https://www.deezer.com" target="_blank" rel="noopener">Deezer</a></span>
+  </footer>
+
+  <script src="separate.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

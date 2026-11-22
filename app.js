@@ -10,6 +10,16 @@
   ];
 
   const $ = (id) => document.getElementById(id);
+
+  const LAYERS = [
+    { id: 'sax', label: 'Saxophon', icon: '🎷', gain: 0.16 },
+    { id: 'kalimba', label: 'Kalimba', icon: '🪵', gain: 0.13 },
+    { id: 'violin', label: 'Geige', icon: '🎻', gain: 0.11 },
+    { id: 'accordion', label: 'Ziehharmonika', icon: '🪗', gain: 0.15 },
+    { id: 'coconut', label: 'Kokusnuss-Geklapper', icon: '🥥', gain: 0.3 },
+    { id: 'dog', label: 'Hundegebell', icon: '🐕', gain: 0.4 },
+  ];
+
   const ui = {
     form: $('search-form'),
     input: $('search-input'),
@@ -32,6 +42,10 @@
     analysisLabel: $('analysis-label'),
     stemRows: $('stem-rows'),
     btnAll: $('btn-all'),
+    layersBlock: $('layers-block'),
+    layerRows: $('layer-rows'),
+    mcInfo: $('mc-info'),
+    srcBtns: document.querySelectorAll('.src-btn'),
   };
 
   const state = {
@@ -53,6 +67,12 @@
     fallbackAudio: null,
     loadToken: 0,
     volume: 1,
+    source: 'deezer',
+    audiusHosts: null,
+    bpm: null,
+    mc: null,
+    trimmedNote: '',
+    layers: { enabled: {}, gains: {}, handles: {}, nextIdx: {}, loop: {}, patterns: {}, timer: null },
   };
 
   function ensureAudioCtx() {
@@ -106,7 +126,7 @@
 
   function renderResults(tracks) {
     ui.results.innerHTML = '';
-    const playable = tracks.filter((t) => t && t.preview);
+    const playable = tracks.filter((t) => t && t.audioUrl);
     if (!playable.length) {
       setStatus('Keine abspielbaren Treffer gefunden.', true);
       return;
@@ -117,13 +137,13 @@
       card.type = 'button';
       card.className = 'track-card';
       card.innerHTML =
-        '<img loading="lazy" alt="" src="' + (t.album && t.album.cover_medium || '') + '">' +
+        '<img loading="lazy" alt="" src="' + (t.cover || '') + '">' +
         '<span class="tc-meta">' +
         '<span class="tc-title"></span>' +
         '<span class="tc-artist"></span>' +
         '</span>';
       card.querySelector('.tc-title').textContent = t.title || '';
-      card.querySelector('.tc-artist').textContent = (t.artist && t.artist.name) || '';
+      card.querySelector('.tc-artist').textContent = t.artist || '';
       card.addEventListener('click', () => {
         document.querySelectorAll('.track-card.active').forEach((el) => el.classList.remove('active'));
         card.classList.add('active');
@@ -133,7 +153,68 @@
     }
   }
 
+  /* ---------- Audius ---------- */
+
+  async function fetchAudiusHosts() {
+    if (state.audiusHosts && state.audiusHosts.length) return state.audiusHosts;
+    const resp = await fetch('https://api.audius.co');
+    if (!resp.ok) throw new Error('Audius nicht erreichbar');
+    const j = await resp.json();
+    state.audiusHosts = (j && j.data) || [];
+    return state.audiusHosts;
+  }
+
+  function audiusStreamUrl(id) {
+    const hosts = state.audiusHosts && state.audiusHosts.length
+      ? state.audiusHosts
+      : ['https://discoveryprovider.audius.co'];
+    const host = hosts[Math.floor(Math.random() * hosts.length)];
+    return host + '/v1/tracks/' + id + '/stream?app_name=DeezerMixer';
+  }
+
+  async function searchAudius(query) {
+    const hosts = await fetchAudiusHosts();
+    if (!hosts.length) throw new Error('Audius nicht erreichbar');
+    const host = hosts[Math.floor(Math.random() * hosts.length)];
+    const resp = await fetch(host + '/v1/tracks/search?query=' + encodeURIComponent(query) + '&app_name=DeezerMixer');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const j = await resp.json();
+    return (j.data || [])
+      .filter((t) => t && t.id && !t.is_delete && t.is_streamable !== false)
+      .map((t) => ({
+        source: 'audius',
+        title: t.title || '',
+        artist: (t.user && t.user.name) || '',
+        cover: (t.artwork && (t.artwork['480x480'] || t.artwork['150x150'])) || '',
+        link: t.permalink ? 'https://audius.co' + t.permalink : 'https://audius.co',
+        duration: t.duration,
+        audioUrl: () => audiusStreamUrl(t.id),
+      }));
+  }
+
+  function normalizeDeezerTracks(data) {
+    return ((data && data.data) || []).filter((t) => t && t.preview).map((t) => ({
+      source: 'deezer',
+      title: t.title || '',
+      artist: (t.artist && t.artist.name) || '',
+      cover: (t.album && t.album.cover_medium) || '',
+      link: t.link,
+      duration: t.duration,
+      audioUrl: t.preview,
+    }));
+  }
+
   /* ---------- Laden & Analysieren ---------- */
+
+  function sliceBufferHead(ctx, buf, maxSec) {
+    const len = Math.min(buf.length, Math.round(maxSec * buf.sampleRate));
+    if (len >= buf.length) return buf;
+    const out = ctx.createBuffer(buf.numberOfChannels, len, buf.sampleRate);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      out.copyToChannel(buf.getChannelData(c).subarray(0, len), c);
+    }
+    return out;
+  }
 
   async function loadTrack(track) {
     const token = ++state.loadToken;
@@ -141,9 +222,9 @@
     if (state.fallbackAudio) { state.fallbackAudio.pause(); state.fallbackAudio = null; }
 
     state.currentTrack = track;
-    ui.npCover.src = (track.album && track.album.cover_medium) || '';
+    ui.npCover.src = track.cover || '';
     ui.npTitle.textContent = track.title || '';
-    ui.npArtist.textContent = (track.artist && track.artist.name) || '';
+    ui.npArtist.textContent = track.artist || '';
     ui.npLink.href = track.link || '#';
     ui.player.classList.remove('hidden');
     ui.analysisLine.classList.remove('hidden');
@@ -154,7 +235,8 @@
     ensureAudioCtx();
     let arrayBuffer;
     try {
-      const resp = await fetch(track.preview);
+      const audioUrl = typeof track.audioUrl === 'function' ? track.audioUrl() : track.audioUrl;
+      const resp = await fetch(audioUrl);
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       arrayBuffer = await resp.arrayBuffer();
     } catch (e) {
@@ -173,6 +255,12 @@
       return;
     }
     if (token !== state.loadToken) return;
+
+    state.trimmedNote = '';
+    if (track.source === 'audius' && audioBuffer.duration > 180.5) {
+      audioBuffer = sliceBufferHead(state.audioCtx, audioBuffer, 180);
+      state.trimmedNote = ' (Audius: Analyse & Wiedergabe auf die ersten 3 Minuten begrenzt)';
+    }
 
     try {
       const sep = await StemSeparation.separateStems(audioBuffer, (pct, label) => {
@@ -217,7 +305,16 @@
     ui.analysisLine.classList.add('hidden');
     ui.timeTotal.textContent = fmtTime(state.duration);
     ui.seek.max = state.duration;
-    setStatus('Analyse fertig – Instrumente über die Schaltflächen stummschalten.');
+    state.bpm = Harmony.estimateBPM(sep.onsetEnv || [], sep.fps || 0);
+    state.mc = Harmony.buildMusicalContext(Harmony.estimateKey(
+      sep.chroma && sep.chroma.length === 12 ? sep.chroma : new Array(12).fill(0)
+    ));
+    ui.layersBlock.classList.remove('hidden');
+    ui.mcInfo.textContent = 'Tonart: ' + state.mc.keyLabel + ' · Tempo: ca. ' +
+      state.bpm + ' BPM (Näherung)';
+    buildLayerRows();
+    setStatus('Analyse fertig' + (state.trimmedNote || '') +
+      ' – Instrumente über die Schaltflächen stummschalten.');
     startPlayback();
   }
 
@@ -227,6 +324,9 @@
     state.offset = 0;
     state.stemBuffers = {};
     state.muted = {};
+    stopLayerScheduler();
+    stopLayerNodes();
+    ui.layersBlock.classList.add('hidden');
     buildStemRows(false, null);
     ui.analysisLine.classList.add('hidden');
     ui.timeTotal.textContent = '0:30';
@@ -318,6 +418,133 @@
     }
   });
 
+  /* ---------- Zusätzliche Instrument-Layer ---------- */
+
+  function stopLayerScheduler() {
+    if (state.layers.timer) {
+      clearInterval(state.layers.timer);
+      state.layers.timer = null;
+    }
+  }
+
+  function stopLayerNodes() {
+    for (const def of LAYERS) {
+      for (const h of state.layers.handles[def.id] || []) h.stop();
+      state.layers.handles[def.id] = [];
+    }
+  }
+
+  function resyncLayers() {
+    stopLayerScheduler();
+    stopLayerNodes();
+    if (state.mode !== 'stems' || !state.playing || !state.mc) return;
+    const anyOn = LAYERS.some((d) => state.layers.enabled[d.id]);
+    if (!anyOn) return;
+    const ph = Math.max(0, state.audioCtx.currentTime - state.startedAt);
+    for (const def of LAYERS) {
+      if (!state.layers.enabled[def.id]) continue;
+      const pat = Harmony.buildPattern(def.id, state.mc, state.bpm);
+      state.layers.patterns[def.id] = pat;
+      let loop = Math.floor(ph / pat.loopDur);
+      const rel = ph - loop * pat.loopDur;
+      let i = pat.events.findIndex((e) => e.t >= rel);
+      if (i < 0) { loop++; i = 0; }
+      state.layers.nextIdx[def.id] = i;
+      state.layers.loop[def.id] = loop;
+    }
+    state.layers.timer = setInterval(layerTick, 100);
+    layerTick();
+  }
+
+  function layerTick() {
+    if (!state.playing || state.mode !== 'stems') return;
+    const now = state.audioCtx.currentTime;
+    for (const def of LAYERS) {
+      if (!state.layers.enabled[def.id]) continue;
+      const pat = state.layers.patterns[def.id];
+      if (!pat) continue;
+      let guard = 0;
+      while (guard++ < 64) {
+        const ev = pat.events[state.layers.nextIdx[def.id]];
+        if (ev === undefined) {
+          state.layers.loop[def.id] += 1;
+          state.layers.nextIdx[def.id] = 0;
+          continue;
+        }
+        const absPlayback = state.layers.loop[def.id] * pat.loopDur + ev.t;
+        if (absPlayback >= state.duration) return;
+        const absCtx = state.startedAt + absPlayback;
+        if (absCtx > now + 0.3) break;
+        if (absCtx >= now - 0.05) {
+          const handle = SynthVoices[def.id](state.audioCtx, state.layers.gains[def.id],
+            Math.max(absCtx, now + 0.01),
+            { freq: state.mc.rootFreq, dur: ev.dur, vel: ev.vel, det: ev.det });
+          state.layers.handles[def.id].push(handle);
+        }
+        state.layers.nextIdx[def.id] += 1;
+      }
+    }
+  }
+
+  function buildLayerRows() {
+    ui.layerRows.innerHTML = '';
+    ensureAudioCtx();
+    for (const def of LAYERS) {
+      if (!state.layers.gains[def.id]) {
+        const g = state.audioCtx.createGain();
+        g.gain.value = def.gain;
+        g.connect(state.masterGain);
+        state.layers.gains[def.id] = g;
+      }
+      if (state.layers.handles[def.id] === undefined) state.layers.handles[def.id] = [];
+      const row = document.createElement('div');
+      row.className = 'stem-row';
+      row.dataset.stem = def.id;
+      const icon = document.createElement('div');
+      icon.className = 'stem-icon';
+      icon.textContent = def.icon;
+      const name = document.createElement('div');
+      name.className = 'stem-name';
+      name.append(def.label);
+      name.appendChild(document.createElement('small')).textContent = 'harmonisch ergänzt';
+      const meter = document.createElement('div');
+      meter.className = 'meter-track';
+      meter.innerHTML = '<div class="meter-fill" style="width:0%"></div>';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'toggle-btn off';
+      btn.textContent = 'Aus';
+      btn.title = def.label + ' dazumischen';
+      row.append(icon, name, meter, btn);
+      ui.layerRows.appendChild(row);
+      btn.addEventListener('click', () => toggleLayer(def.id));
+    }
+    refreshLayerRows();
+  }
+
+  function refreshLayerRows() {
+    for (const def of LAYERS) {
+      const row = ui.layerRows.querySelector('[data-stem="' + def.id + '"]');
+      if (!row) continue;
+      const btn = row.querySelector('.toggle-btn');
+      const on = !!state.layers.enabled[def.id];
+      btn.textContent = on ? 'Ein' : 'Aus';
+      btn.className = 'toggle-btn ' + (on ? 'on' : 'off');
+    }
+  }
+
+  function toggleLayer(id) {
+    if (state.mode !== 'stems') return;
+    ensureAudioCtx();
+    state.layers.enabled[id] = !state.layers.enabled[id];
+    if (!state.layers.enabled[id]) {
+      for (const h of state.layers.handles[id] || []) h.stop();
+      state.layers.handles[id] = [];
+    }
+    refreshLayerRows();
+    resyncLayers();
+  }
+
   /* ---------- Transport ---------- */
 
   function currentTime() {
@@ -334,6 +561,8 @@
   function stopPlayback() {
     state.playing = false;
     stopSources();
+    stopLayerScheduler();
+    stopLayerNodes();
     if (state.fallbackAudio) { state.fallbackAudio.pause(); }
     ui.btnPlay.textContent = '▶';
     cancelAnimationFrame(state.rafId);
@@ -360,9 +589,10 @@
     }
     state.startedAt = now - offset;
     state.playing = true;
-    ui.btnPlay.textContent = '⏸';
+    ui.btnPlay.textContent = '⌛';
     cancelAnimationFrame(state.rafId);
     state.rafId = requestAnimationFrame(raf);
+    resyncLayers();
   }
 
   function seekTo(t) {
@@ -448,18 +678,37 @@
 
   /* ---------- Suche ---------- */
 
+  const placeholders = {
+    deezer: 'Song, Künstler oder Album suchen …',
+    audius: 'Audius durchsuchen – freie Musik in voller Länge …',
+  };
+
   function doSearch(q) {
     ui.searchBtn.disabled = true;
-    setStatus('Suche nach „' + q + '" …');
+    setStatus('Suche auf ' + (state.source === 'audius' ? 'Audius' : 'Deezer') + ' nach „' + q + '" …');
     ui.results.innerHTML = '';
     ui.player.classList.add('hidden');
-    searchDeezer(q)
-      .then((data) => {
-        renderResults((data && data.data) || []);
-      })
+    const p = state.source === 'audius'
+      ? searchAudius(q)
+      : searchDeezer(q).then(normalizeDeezerTracks);
+    p.then((list) => renderResults(list))
       .catch((e) => setStatus('Suche fehlgeschlagen: ' + e.message, true))
       .finally(() => { ui.searchBtn.disabled = false; });
   }
+
+  ui.srcBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (state.source === btn.dataset.src) return;
+      state.source = btn.dataset.src;
+      ui.srcBtns.forEach((b) => b.classList.toggle('active', b === btn));
+      ui.input.placeholder = placeholders[state.source];
+      ui.results.innerHTML = '';
+      ui.player.classList.add('hidden');
+      setStatus(state.source === 'audius'
+        ? 'Audius: freie Musik in voller Länge (Analyse der ersten 3 Minuten).'
+        : 'Deezer: riesiger Katalog als 30-Sekunden-Previews.');
+    });
+  });
 
   ui.form.addEventListener('submit', (e) => {
     e.preventDefault();

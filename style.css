@@ -385,3 +385,54 @@ input, button { -webkit-tap-highlight-color: transparent; }
   .results { grid-template-columns: 1fr; }
   .stem-row { grid-template-columns: 28px minmax(0, 1fr) 88px; }
 }
+
+/* ---------- Quellschalter & Instrument-Layer ---------- */
+.source-switch {
+  display: flex;
+  gap: 6px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 12px;
+}
+.src-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 8px;
+  min-height: 42px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.src-btn.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: white;
+}
+.src-btn:hover:not(.active) { color: var(--text); }
+
+.toggle-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.toggle-btn.on { background: var(--ok); border-color: var(--ok); color: #05281d; }
+.toggle-btn.off { background: transparent; color: var(--text-dim); border-color: var(--border); }
+
+.mc-info { color: var(--text-dim); font-size: 13px; margin: 10px 0 0; }
+
+@media (max-width: 640px) {
+  .source-switch { margin-bottom: 10px; }
+  .src-btn { min-height: 44px; font-size: 13.5px; }
+  .toggle-btn { min-height: 48px; font-size: 14px; }
+}

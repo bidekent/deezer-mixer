@@ -142,6 +142,10 @@
     report(5, 'Fensterspektren werden berechnet ...');
     await tick();
 
+    const chroma = new Float64Array(12);
+    const onsetEnv = new Float32Array(nFrames);
+    const fps = sr / hop;
+
     const reL = new Float32Array(nFrames * bins);
     const imL = new Float32Array(nFrames * bins);
     const reR = new Float32Array(nFrames * bins);
@@ -232,6 +236,16 @@
         const rRe = reR[base + b], rIm = imR[base + b];
         const mRe = (lRe + rRe) * 0.5, mIm = (lIm + rIm) * 0.5;
 
+        if (f > 2) {
+          const fHz = b * binHz;
+          if (fHz >= 55 && fHz <= 4200) {
+            const pc = ((Math.round(12 * Math.log2(fHz / 440) + 69) % 12) + 12) % 12;
+            const e2 = mag[base + b] * mag[base + b];
+            chroma[pc] += e2 * hb;
+          }
+          onsetEnv[f] += mP * mag[base + b] * mag[base + b];
+        }
+
         spec.drums.Lre[b] = mP * lRe; spec.drums.Lim[b] = mP * lIm;
         spec.drums.Rre[b] = mP * rRe; spec.drums.Rim[b] = mP * rIm;
         spec.bass.Lre[b] = bm * mRe; spec.bass.Lim[b] = bm * mIm;
@@ -299,7 +313,7 @@
       stems[id] = { L: outs[id].L.subarray(0, len), R: outs[id].R.subarray(0, len) };
     }
     report(100, 'Fertig');
-    return { stems, shares, sampleRate: sr };
+    return { stems, shares, sampleRate: sr, chroma: Array.from(chroma), onsetEnv, fps };
   }
 
   const api = { makeFFT, separateStems };

@@ -19,6 +19,10 @@
 
   <main class="main">
     <section class="search-card">
+      <div class="source-switch" role="tablist" aria-label="Musikquelle">
+        <button type="button" class="src-btn active" data-src="deezer">🎵 Deezer (30s-Preview)</button>
+        <button type="button" class="src-btn" data-src="audius">🎧 Audius (volle Tracks)</button>
+      </div>
       <form id="search-form" autocomplete="off">
         <input id="search-input" type="search" placeholder="Song, Künstler oder Album suchen …" required>
         <button type="submit" id="search-btn">Suchen</button>
@@ -64,7 +68,17 @@
         </div>
         <div id="stem-rows"></div>
         <p class="note">Die Trennung erfolgt live im Browser (STFT + Harmonic/Percussive-Analyse) und ist eine
-          Näherung, kein perfektes Stem-Mastering. Quelle: 30-Sekunden-Preview der Deezer API.</p>
+          Näherung, kein perfektes Stem-Mastering. Quelle: 30-Sekunden-Preview der Deezer API bzw. volle Tracks von Audius.</p>
+      </div>
+
+      <div class="stems" id="layers-block">
+        <div class="stems-head">
+          <span>Zusätzliche Instrumente (harmonisch eingefügt)</span>
+        </div>
+        <div id="layer-rows"></div>
+        <p id="mc-info" class="mc-info"></p>
+        <p class="note">Diese Klänge werden synthetisiert und nach Tonart &amp; Tempo des Stücks
+          abgestimmt, sie gehören nicht zur Original-Aufnahme.</p>
       </div>
     </section>
   </main>
@@ -76,6 +90,8 @@
   </footer>
 
   <script src="separate.js"></script>
+  <script src="harmony.js"></script>
+  <script src="synth.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

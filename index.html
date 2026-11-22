@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Deezer Mixer</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -47,6 +47,11 @@
         <span id="time-total" class="time">0:30</span>
       </div>
 
+      <div class="volume-row">
+        <span class="vol-icon">🔊</span>
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Lautstärke">
+      </div>
+
       <div class="progress-line hidden" id="analysis-line">
         <div class="progress-track"><div id="analysis-bar" class="progress-fill"></div></div>
         <span id="analysis-label">Analysiere …</span>
@@ -65,7 +70,8 @@
   </main>
 
   <footer class="footer">
-    <span>Tastatur: <kbd>Leertaste</kbd> Wiedergabe/Pause · <kbd>1</kbd>–<kbd>4</kbd> Instrumente stummschalten</span>
+    <span class="kbd-hints">Tastatur: <kbd>Leertaste</kbd> Wiedergabe/Pause · <kbd>1</kbd>–<kbd>4</kbd> Instrumente stummschalten</span>
+    <span class="touch-hints">Tippen zum Abspielen · Instrumente antippen zum Stummschalten</span>
     <span>Inhalte &amp; Previews: <a href="https://www.deezer.com" target="_blank" rel="noopener">Deezer</a></span>
   </footer>
 

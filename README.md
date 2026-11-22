@@ -20,6 +20,7 @@ sich einzelne Instrumente **stummschalten**.
   | 🎸 Bass | harmonischer Anteil < ~430 Hz, Mid-Kanal |
   | 🎹 Andere Instrumente | Rest-Signal (Summe aller vier = Original) |
 - 🔇 **Mute-Schalter** pro Instrument + Live-Pegelanzeige pro Kanal
+- 📱 **Touch-optimiert**: große Bedienelemente (≥ 44 px), Lautstärkeregler, tapping für Mute
 - ⌨️ **Tastatur**: `Leertaste` = Play/Pause, `1`–`4` = Instrumente stummschalten
 - 📊 Der erkannte **Energieanteil** jedes Instruments wird als Konfidenz angezeigt
 

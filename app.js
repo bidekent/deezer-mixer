@@ -26,6 +26,7 @@
     timeCur: $('time-cur'),
     timeTotal: $('time-total'),
     seek: $('seek'),
+    volume: $('volume'),
     analysisLine: $('analysis-line'),
     analysisBar: $('analysis-bar'),
     analysisLabel: $('analysis-label'),
@@ -51,13 +52,14 @@
     mode: 'idle',
     fallbackAudio: null,
     loadToken: 0,
+    volume: 1,
   };
 
   function ensureAudioCtx() {
     if (!state.audioCtx) {
       state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       state.masterGain = state.audioCtx.createGain();
-      state.masterGain.gain.value = 1;
+      state.masterGain.gain.value = state.volume;
       state.masterGain.connect(state.audioCtx.destination);
       state.meterData = new Uint8Array(2048);
     }
@@ -232,7 +234,7 @@
     setStatus('Die Preview konnte nicht für die Analyse geladen werden (CORS/Netzwerk). ' +
       'Es wird normal abgespielt, ohne Stummschaltung der Instrumente.', true);
     const audio = new Audio(track.preview);
-    audio.volume = 1;
+    audio.volume = state.volume;
     state.fallbackAudio = audio;
     audio.play().catch(() => setStatus('Autoplay blockiert – Play drücken.', true));
     state.playing = true;
@@ -424,6 +426,14 @@
 
   ui.seek.addEventListener('input', () => {
     seekTo(parseFloat(ui.seek.value));
+  });
+
+  ui.volume.addEventListener('input', () => {
+    state.volume = parseFloat(ui.volume.value);
+    if (state.masterGain && state.audioCtx) {
+      state.masterGain.gain.setTargetAtTime(state.volume, state.audioCtx.currentTime, 0.02);
+    }
+    if (state.fallbackAudio) state.fallbackAudio.volume = state.volume;
   });
 
   document.addEventListener('keydown', (e) => {
